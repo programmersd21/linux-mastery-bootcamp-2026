@@ -20,50 +20,21 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find and extract ZIP files
+      - name: Extract ZIP files to root and delete
         run: |
-          echo "Searching for ZIP files..."
-          find . -name "*.zip" -type f | while read -r zipfile; do
-            # Skip files inside .git directory
-            if echo "$zipfile" | grep -q "/.git/"; then
-              continue
-            fi
-            
-            # Create extraction directory based on zip filename
-            extract_dir="${zipfile%.zip}"
-            
-            echo "Extracting: $zipfile -> $extract_dir"
-            
-            # Remove existing extraction directory if present
-            if [ -d "$extract_dir" ]; then
-              rm -rf "$extract_dir"
-            fi
-            
-            # Create directory and extract
-            mkdir -p "$extract_dir"
-            unzip -o "$zipfile" -d "$extract_dir"
-            
-            # Optionally remove the zip file after extraction
-            # rm "$zipfile"
-            # echo "Removed: $zipfile"
+          find . -name "*.zip" -type f -not -path "./.git/*" | while read -r zipfile; do
+            echo "Extracting: $zipfile"
+            unzip -o "$zipfile" -d .
+            rm "$zipfile"
+            echo "Deleted: $zipfile"
           done
 
-      - name: Check for changes
-        id: git-check
-        run: |
-          git add -A
-          if git diff --cached --quiet; then
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes to commit"
-          else
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Changes detected"
-          fi
-
-      - name: Commit and push extracted files
-        if: steps.git-check.outputs.changed == 'true'
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: extract zip archives [skip ci]"
-          git push
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: extract zip archives [skip ci]"
+            git push
+          fi
